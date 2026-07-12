@@ -1,0 +1,309 @@
+body {
+    background-color: #060818;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    max-width: 1200px;
+    width: 100%;
+    margin: 50px auto 0;
+    padding: 0 16px;
+    box-sizing: border-box;
+}
+
+/* --- Stat boxes --- */
+.stats {
+    display: flex;
+    justify-content: space-around;
+    gap: 16px;
+    margin-bottom: 45px;
+}
+.stat-box {
+    background-color: #0e1726;
+    border-radius: 8px;
+    text-align: center;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    transition: border-radius 0.3s;
+}
+.stat-box.open {
+    border-radius: 8px 8px 0 0;
+}
+.stat-box-content {
+    padding: 10px;
+    min-height: 102px;
+    box-sizing: border-box;
+}
+.stat-box svg {
+    position: absolute;
+    right: 15px;
+    bottom: 9px;
+    scale: 1.3;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+.stat-box svg.rotated {
+    transform: rotate(180deg);
+}
+.hidden-content {
+    display: none;
+    background: linear-gradient(229deg, #517281 0%, #3b5d70 27%, #4d5c82 72%, #5d647f 100%);
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 0 0 8px 8px;
+    font-size: 0.85em;
+}
+
+/* --- Search / toolbar --- */
+#search-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+#search {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #0e1726;
+    color: #ffffff;
+}
+#search-container button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    background-color: #0e1726;
+    color: #ffffff;
+    cursor: pointer;
+}
+#search-container button.secondary {
+    background-color: #0a0f1c;
+}
+
+/* --- Modal --- */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    padding-top: 60px;
+}
+.modal-content {
+    background-color: #0e1726;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    border-radius: 8px;
+    color: #ffffff;
+}
+.modal h2 {
+    text-align: center;
+}
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close:hover,
+.close:focus {
+    color: #fff;
+    text-decoration: none;
+}
+
+/* --- Rating widgets --- */
+.star-rating,
+.heart-rating {
+    display: flex;
+    justify-content: center;
+    flex-direction: row-reverse; /* so hover/checked cascades left-to-right */
+}
+.star-rating input,
+.heart-rating input {
+    display: none;
+}
+.star-rating label,
+.heart-rating label {
+    font-size: 2em;
+    color: #444;
+    cursor: pointer;
+    position: relative;
+}
+.star-rating input:checked ~ label {
+    color: gold;
+}
+.heart-rating input:checked ~ label {
+    color: red;
+}
+.star-rating label:hover,
+.star-rating label:hover ~ label,
+.star-rating input:hover ~ label {
+    color: darkgoldenrod;
+}
+.heart-rating label:hover,
+.heart-rating label:hover ~ label,
+.heart-rating input:hover ~ label {
+    color: darkred;
+}
+.heart-full {
+    margin-left: 8px;
+}
+.heart-half {
+    width: 16px;
+    overflow: hidden;
+}
+
+/* --- Form --- */
+.entry-form {
+    width: 80%;
+    margin: auto;
+}
+.field-row {
+    display: flex;
+    gap: 20px;
+}
+.inline-add {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.form-group {
+    margin-bottom: 15px;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+}
+.form-group input,
+.form-group select,
+.form-group button {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #0e1726;
+    color: #ffffff;
+    box-sizing: border-box;
+}
+.form-group button {
+    cursor: pointer;
+    width: 135px;
+}
+.ratings {
+    display: flex;
+    justify-content: center;
+    gap: 100px;
+}
+
+/* --- Table --- */
+.table-wrap {
+    overflow-x: auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #0e1726;
+}
+th {
+    background-color: #0e1726;
+}
+.date-cell {
+    width: 135px;
+}
+td:last-child {
+    position: relative;
+}
+tr:hover {
+    background-color: #0e1726;
+}
+.empty-row td {
+    text-align: center;
+    color: #8a93a6;
+    padding: 30px 10px;
+}
+.add-sequel {
+    display: none;
+    height: 17px;
+    width: 17px;
+    position: absolute;
+    right: 8px;
+    cursor: pointer;
+}
+tr:hover .add-sequel {
+    display: inline;
+}
+
+/* --- Tags --- */
+.selected-tags {
+    background-color: #0e1726;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.tag {
+    background-color: #0e1726;
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+.remove-tag {
+    cursor: pointer;
+    color: red;
+}
+
+@media (max-width: 560px) {
+    .ratings {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .stats {
+        flex-wrap: wrap;
+    }
+    .stat-box {
+        flex: 1 1 45%;
+    }
+}
+
+/* --- Heart rating icon --- */
+.heart-icon {
+    vertical-align: middle;
+}
+
+/* --- "Update available" toast --- */
+#update-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: #0e1726;
+    border: 1px solid #3a4356;
+    border-radius: 8px;
+    padding: 12px 16px;
+    z-index: 10;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+#update-toast button {
+    background-color: #1f6feb;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+}
