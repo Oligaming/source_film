@@ -31,7 +31,11 @@ jobs:
           sed -i "s#const VERSION = '.*';#const VERSION = '${GITHUB_SHA::7}';#" web/sw.js
           grep "const VERSION" web/sw.js
 
+      # enablement: true creates the Pages site on first run, so no manual
+      # "Settings -> Pages" step is needed.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       # Publish web/ as the site root, so start_url "./" resolves cleanly.
       - uses: actions/upload-pages-artifact@v3
