@@ -5,3 +5,7 @@ Thumbs.db
 
 # Local tooling
 .claude/
+
+# Personal data (never publish to the public repo)
+import-historique.json
+viewed-tv-*.json
