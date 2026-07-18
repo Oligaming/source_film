@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#060818">
+    <title>My Movies/Series</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+    <!-- Shared SVG defs (half-heart gradient) so rows don't duplicate ids. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="heart-half-gradient">
+                <stop offset="50%" stop-color="#ff4d6d"/>
+                <stop offset="50%" stop-color="#3a4356"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-box-content">
+                <h2>Total Movies</h2>
+                <p id="total-movies">0</p>
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></svg>
+            </div>
+            <div class="hidden-content" id="movies-detail"></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-box-content">
+                <h2>Total Series</h2>
+                <p id="total-series">0</p>
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></svg>
+            </div>
+            <div class="hidden-content" id="series-detail"></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-box-content">
+                <h2>Total 44m</h2>
+                <p id="total-44m">0</p>
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></svg>
+            </div>
+            <div class="hidden-content" id="44m-detail"></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-box-content">
+                <h2>Total Combined</h2>
+                <p id="total-combined">0</p>
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M480-528 296-344l-56-56 240-240 240 240-56 56-184-184Z"/></svg>
+            </div>
+            <div class="hidden-content" id="combined-detail"></div>
+        </div>
+    </div>
+
+    <div id="search-container">
+        <input type="text" id="search" placeholder="Search…  (try #type:movie  #rating:5  #tag:sci-fi)">
+        <button id="add-new">+ Add new</button>
+        <button id="settings-btn" class="secondary">⚙ Settings</button>
+        <input type="file" id="import-file" accept="application/json" hidden>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-sort="id">ID</th>
+                    <th data-sort="rating">Rating</th>
+                    <th data-sort="heart">Heart</th>
+                    <th data-sort="name">Name</th>
+                    <th data-sort="season">Season</th>
+                    <th data-sort="type">Type</th>
+                    <th data-sort="date">Date</th>
+                    <th data-sort="saga">Saga</th>
+                    <th>Tags</th>
+                    <th data-sort="rewatched">Rewatched</th>
+                    <th data-sort="sequel">Sequel</th>
+                </tr>
+            </thead>
+            <tbody id="entries"></tbody>
+        </table>
+    </div>
+
+    <!-- Settings modal: sync/backup + Android install tutorial -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content settings-content">
+            <span class="close" id="settings-close" role="button" tabindex="0" aria-label="Close">&times;</span>
+            <h2>Settings</h2>
+
+            <section class="settings-section">
+                <h3>Sync &amp; backup</h3>
+                <p id="last-sync" class="sync-status">Last sync: never</p>
+                <div class="settings-actions">
+                    <button type="button" id="export-btn">Export data</button>
+                    <button type="button" id="import-btn" class="secondary">Import &amp; merge</button>
+                </div>
+                <p class="hint">Your data lives only on this device. To sync with the
+                    phone app (or make a backup): <b>Export</b> here, send the file to
+                    the other device (Drive, mail, USB…), then <b>Import &amp; merge</b>
+                    there. Only new entries are added — nothing gets duplicated. Do it
+                    in both directions to fully sync both devices.</p>
+            </section>
+
+            <section class="settings-section">
+                <h3>Install on Android</h3>
+                <ol class="tuto">
+                    <li>Push this repo to GitHub — the included workflow deploys the
+                        app to <b>GitHub Pages</b> automatically:<br>
+                        <code>https://&lt;user&gt;.github.io/source_film/</code>
+                        (any static HTTPS host works too).</li>
+                    <li>On the phone, open that URL in <b>Chrome</b>.</li>
+                    <li>Menu <b>⋮</b> → <b>Install app</b> (or <i>Add to Home
+                        screen</i>).</li>
+                    <li>Launch it from the home screen — it runs fullscreen, works
+                        offline, and stores its data on the phone.</li>
+                </ol>
+                <p class="hint">Updates are automatic: every push stamps a new
+                    version, and the installed app shows an <b>Update</b> button on
+                    the next launch. (On another host, bump <code>VERSION</code> in
+                    <code>sw.js</code> yourself.)</p>
+            </section>
+        </div>
+    </div>
+
+    <!-- Add / prefill modal -->
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="modal-close" role="button" tabindex="0" aria-label="Close">&times;</span>
+            <h2 id="modal-title">Add New Entry</h2>
+            <form id="add-entry-form" class="entry-form">
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="type">Type:</label>
+                    <select id="type" name="type" required>
+                        <option value="Movie">Movie</option>
+                        <option value="Series">Series</option>
+                        <option value="44 min">44 min</option>
+                    </select>
+                </div>
+                <div class="form-group" id="season-group" hidden>
+                    <label for="season">Season:</label>
+                    <input type="text" id="season" name="season" pattern="[0-9\-]+" inputmode="numeric">
+                </div>
+                <div class="field-row">
+                    <div class="form-group">
+                        <label for="date">Date:</label>
+                        <input type="date" id="date" name="date" required>
+                        <button type="button" id="set-today-date">Today</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Time:</label>
+                        <input type="time" id="time" name="time" required>
+                        <button type="button" id="set-today-time">Now</button>
+                    </div>
+                </div>
+                <div class="ratings">
+                    <div class="form-group">
+                        <label>Rating:</label>
+                        <div class="star-rating">
+                            <input type="radio" id="5-stars" name="rating" value="5" />
+                            <label for="5-stars" class="star">&#9733;</label>
+                            <input type="radio" id="4-stars" name="rating" value="4" />
+                            <label for="4-stars" class="star">&#9733;</label>
+                            <input type="radio" id="3-stars" name="rating" value="3" />
+                            <label for="3-stars" class="star">&#9733;</label>
+                            <input type="radio" id="2-stars" name="rating" value="2" />
+                            <label for="2-stars" class="star">&#9733;</label>
+                            <input type="radio" id="1-star" name="rating" value="1" />
+                            <label for="1-star" class="star">&#9733;</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Heart:</label>
+                        <div class="heart-rating">
+                            <input type="radio" id="2-heart" name="heart" value="3" />
+                            <label for="2-heart" class="heart heart-full">&#10084;</label>
+                            <input type="radio" id="1-heart" name="heart" value="2" />
+                            <label for="1-heart" class="heart heart-half" dir="rtl">&#10084;</label>
+                            <input type="radio" id="0.5-heart" name="heart" value="1" />
+                            <label for="0.5-heart" class="heart heart-half">&#10084;</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="saga">Saga:</label>
+                    <div class="inline-add">
+                        <select id="saga" name="saga">
+                            <option value="">Select Saga</option>
+                        </select>
+                        <button type="button" id="add-saga">+ Add Saga</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="tags">Tags:</label>
+                    <div class="inline-add">
+                        <select id="tags" name="tags">
+                            <option value="">Select Tag</option>
+                        </select>
+                        <button type="button" id="add-tag">+ Add Tag</button>
+                    </div>
+                    <div id="selected-tags" class="selected-tags"></div>
+                </div>
+                <div class="form-group">
+                    <label for="rewatched">Rewatched:</label>
+                    <select id="rewatched" name="rewatched" required>
+                        <option value="No" selected>No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sequel">Sequel:</label>
+                    <select id="sequel" name="sequel" required>
+                        <option value="No" selected>No</option>
+                        <option value="Yes">Yes</option>
+                        <option value="Maybe">Maybe</option>
+                    </select>
+                </div>
+                <button type="submit" id="entry-submit">Add Entry</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
