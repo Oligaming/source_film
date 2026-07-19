@@ -920,8 +920,13 @@ function registerServiceWorker() {
 
     // Reload once the fresh worker takes control.
     let reloaded = false;
+    let hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (reloaded) return;
+        if (!hadController) {
+            hadController = true;
+            return;
+        }
         reloaded = true;
         location.reload();
     });
