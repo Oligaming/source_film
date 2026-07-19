@@ -24,12 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Stamp a unique service-worker version so the app detects each release
-      # and offers the in-app "Update" prompt.
-      - name: Version the service worker
+      - name: Version the service worker and app
         run: |
           sed -i "s#const VERSION = '.*';#const VERSION = '${GITHUB_SHA::7}';#" web/sw.js
+          sed -i "s#const APP_VERSION = '.*';#const APP_VERSION = '${GITHUB_SHA::7}';#" web/app.js
           grep "const VERSION" web/sw.js
+          grep "const APP_VERSION" web/app.js
 
       # enablement: true creates the Pages site on first run, so no manual
       # "Settings -> Pages" step is needed.

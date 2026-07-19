@@ -1,6 +1,7 @@
 // app.js — UI logic for the local movie/series tracker.
 // Source of truth is the `entries` array, loaded once from IndexedDB (Store).
 
+const APP_VERSION = 'dev';
 const TYPES = ['Movie', 'Series', '44 min'];
 const SEQUEL_LABELS = ['No', 'Yes', 'Maybe'];
 let entries = [];
@@ -414,6 +415,8 @@ function openSettings() {
     if (urlEl) urlEl.value = url;
     if (keyEl) keyEl.value = key;
     renderSupabaseStatus();
+    const verEl = $('settings-version');
+    if (verEl) verEl.textContent = APP_VERSION;
     $('settings-modal').style.display = 'block';
 }
 
