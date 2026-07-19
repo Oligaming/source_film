@@ -409,8 +409,10 @@ function renderSupabaseStatus(msg = '', isError = false) {
 function openSettings() {
     renderLastSync();
     const { url, key } = getSupabaseCredentials();
-    $('sb-url').value = url;
-    $('sb-key').value = key;
+    const urlEl = $('sb-url');
+    const keyEl = $('sb-key');
+    if (urlEl) urlEl.value = url;
+    if (keyEl) keyEl.value = key;
     renderSupabaseStatus();
     $('settings-modal').style.display = 'block';
 }
@@ -719,7 +721,7 @@ function wireEvents() {
         if (e.target.files[0]) importData(e.target.files[0]);
         e.target.value = '';
     });
-    $('sb-save-btn').addEventListener('click', () => {
+    $('sb-save-btn')?.addEventListener('click', () => {
         const url = $('sb-url').value.trim();
         const key = $('sb-key').value.trim();
         localStorage.setItem(SB_URL_KEY, url);
@@ -728,7 +730,7 @@ function wireEvents() {
         renderSupabaseStatus();
         alert('Supabase configuration saved.');
     });
-    $('sb-sync-btn').addEventListener('click', syncWithSupabase);
+    $('sb-sync-btn')?.addEventListener('click', syncWithSupabase);
     $('set-today-date').addEventListener('click', setTodayDate);
     $('set-today-time').addEventListener('click', setNowTime);
     $('add-saga').addEventListener('click', () => {
