@@ -665,6 +665,65 @@ async function syncWithSupabase() {
     }
 }
 
+// Overwrite the cloud with this device's data, no merge. Reachable only by
+// holding the sync button (see wireForcePush) because it destroys whatever the
+// cloud held — including entries added on another device that never reached
+// here. Intended for repairing a bad cloud copy.
+async function forcePushToSupabase() {
+    if (!initSupabase()) {
+        const { url, key } = getSupabaseCredentials();
+        alert(!url || !key
+            ? 'Please configure Supabase URL and Anon Key first.'
+            : 'The Supabase library could not be loaded. Cloud sync needs a connection — check that you are online.');
+        return;
+    }
+
+    $('sb-sync-btn').disabled = true;
+    try {
+        const localEntries = await Store.all();
+
+        // Say exactly what is about to be destroyed, rather than "are you sure?".
+        const { count: remoteCount, error: countError } = await supabaseClient
+            .from('entries')
+            .select('id', { count: 'exact', head: true });
+        if (countError) throw countError;
+
+        const confirmed = confirm(
+            'FORCE UPLOAD — this is not a sync.\n\n' +
+            `The cloud currently holds ${remoteCount ?? '?'} entr${remoteCount === 1 ? 'y' : 'ies'}. ` +
+            `All of them will be deleted and replaced by the ${localEntries.length} ` +
+            `entr${localEntries.length === 1 ? 'y' : 'ies'} on this device.\n\n` +
+            'Anything saved on another device that has not reached this one yet will be lost. ' +
+            'This cannot be undone.\n\nContinue?'
+        );
+        if (!confirmed) {
+            renderSupabaseStatus('Force upload cancelled.', false);
+            return;
+        }
+
+        renderSupabaseStatus('Force uploading…', false);
+
+        const { error: deleteError } = await supabaseClient.from('entries').delete().gte('id', 0);
+        if (deleteError) throw deleteError;
+
+        if (localEntries.length > 0) {
+            const { error: insertError } = await supabaseClient.from('entries').insert(localEntries);
+            if (insertError) throw insertError;
+        }
+
+        setLastSync('supabase', localEntries.length);
+        renderSupabaseStatus(`Force upload complete — cloud now mirrors this device (${localEntries.length}).`, false);
+        alert(`Force upload complete.\nThe cloud now holds the ${localEntries.length} entries from this device.`);
+    } catch (err) {
+        console.error('Supabase force push error:', err);
+        renderSupabaseStatus(`Force upload failed: ${err.message || err}`, true);
+        alert('Force upload failed: ' + (err.message || err) +
+            '\n\nYour local data is untouched. The cloud copy may be incomplete — run it again once you are back online.');
+    } finally {
+        $('sb-sync-btn').disabled = false;
+    }
+}
+
 // --- Import / export -------------------------------------------------------
 async function exportData() {
     const data = await Store.all();
@@ -754,6 +813,67 @@ async function reload() {
     renderStats(entries);
 }
 
+// Tap = normal two-way sync. Hold for FORCE_HOLD_MS = force upload. The CSS
+// fill animation is driven by the same class, so what the user sees filling and
+// what decides to fire cannot drift apart.
+const FORCE_HOLD_MS = 5000;
+
+function wireForcePush(btn) {
+    if (!btn) return;
+    btn.style.setProperty('--force-hold', `${FORCE_HOLD_MS}ms`);
+
+    let timer = null;
+    let justForced = false;
+
+    const cancel = () => {
+        clearTimeout(timer);
+        timer = null;
+        btn.classList.remove('holding');
+    };
+    const begin = () => {
+        if (timer || btn.disabled) return;
+        justForced = false;
+        // Measure now, not once at startup: the button's size depends on the
+        // viewport and on the modal being open.
+        const { width, height } = btn.getBoundingClientRect();
+        btn.style.setProperty('--fill-to', `${Math.ceil(Math.max(width, height) / 2)}px`);
+        btn.classList.add('holding');
+        timer = setTimeout(() => {
+            cancel();
+            justForced = true;   // suppress the click this press will produce
+            forcePushToSupabase();
+        }, FORCE_HOLD_MS);
+    };
+
+    btn.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        begin();
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
+        btn.addEventListener(ev, cancel);
+    }
+    // A touch hold would otherwise raise the context menu mid-gesture.
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Keyboard equivalent, so the action is not mouse/touch only.
+    btn.addEventListener('keydown', e => {
+        if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) begin();
+    });
+    btn.addEventListener('keyup', e => {
+        if (e.key === 'Enter' || e.key === ' ') cancel();
+    });
+    btn.addEventListener('blur', cancel);
+
+    btn.addEventListener('click', e => {
+        if (justForced) {          // released after a completed hold
+            justForced = false;
+            e.preventDefault();
+            return;
+        }
+        syncWithSupabase();
+    });
+}
+
 function wireEvents() {
     $('search').addEventListener('input', refresh);
     $('add-new').addEventListener('click', openModal);
@@ -777,7 +897,7 @@ function wireEvents() {
         renderSupabaseStatus();
         alert('Supabase configuration saved.');
     });
-    $('sb-sync-btn')?.addEventListener('click', syncWithSupabase);
+    wireForcePush($('sb-sync-btn'));
     $('set-today-date').addEventListener('click', setTodayDate);
     $('set-today-time').addEventListener('click', setNowTime);
     $('add-saga').addEventListener('click', () => {

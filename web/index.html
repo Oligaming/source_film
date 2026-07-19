@@ -120,9 +120,10 @@
                 </div>
                 <div class="settings-actions" style="margin-top: 10px;">
                     <button type="button" id="sb-save-btn">Save Config</button>
-                    <button type="button" id="sb-sync-btn" class="secondary">Sync Now</button>
+                    <button type="button" id="sb-sync-btn" class="secondary" aria-describedby="sb-force-hint"><span class="hold-label">Sync Now</span></button>
                 </div>
                 <p class="hint">Enter your Supabase database details to sync across all devices. Sync will automatically download remote changes, upload local changes, and resolve ID conflicts in creation order.</p>
+                <p class="hint" id="sb-force-hint"><b>Force upload:</b> press and hold <b>Sync Now</b> for 5 seconds — the button fills in from the edges — to overwrite the cloud with this device's data. Anything stored in the cloud that is not on this device is deleted. Use it to repair a bad cloud copy, not for everyday syncing.</p>
             </section>
 
             <section class="settings-section">
