@@ -1,7 +1,7 @@
 // app.js — UI logic for the local movie/series tracker.
 // Source of truth is the `entries` array, loaded once from IndexedDB (Store).
 
-const APP_VERSION = 'dev';
+const APP_VERSION = 'v1.1.0';
 const TYPES = ['Movie', 'Series', '44 min'];
 const SEQUEL_LABELS = ['No', 'Yes', 'Maybe'];
 let entries = [];
@@ -425,7 +425,22 @@ function renderSupabaseStatus(msg = '', isError = false) {
     }
 }
 
-function openSettings() {
+function getServiceWorkerVersion() {
+    return new Promise((resolve) => {
+        if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+            resolve('inactive');
+            return;
+        }
+        const channel = new MessageChannel();
+        channel.port1.onmessage = event => {
+            resolve(event.data.version);
+        };
+        navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
+        setTimeout(() => resolve('timeout'), 1000);
+    });
+}
+
+async function openSettings() {
     renderLastSync();
     const { url, key } = getSupabaseCredentials();
     const urlEl = $('sb-url');
@@ -434,7 +449,14 @@ function openSettings() {
     if (keyEl) keyEl.value = key;
     renderSupabaseStatus();
     const verEl = $('settings-version');
-    if (verEl) verEl.textContent = APP_VERSION;
+    if (verEl) {
+        try {
+            const swVer = await getServiceWorkerVersion();
+            verEl.textContent = `${APP_VERSION} (SW: ${swVer})`;
+        } catch (e) {
+            verEl.textContent = APP_VERSION;
+        }
+    }
     $('settings-modal').style.display = 'block';
 }
 
