@@ -20,6 +20,13 @@ function formatDate(value) {
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function safeGetISOString(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return new Date().toISOString();
+    const cleaned = dateStr.trim().replace(' ', 'T');
+    const d = new Date(cleaned);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 // Tags are stored as an array; tolerate legacy comma strings on import.
 const tagList = tags =>
     (Array.isArray(tags) ? tags : String(tags || '').split(','))
@@ -408,7 +415,7 @@ function openSettings() {
     $('settings-modal').style.display = 'block';
 }
 
-function resolveSync(local, remote) {
+function resolveSync(local, remote, cutoff) {
     const keyFn = e => [
         e.name.trim().toLowerCase(),
         e.type,
@@ -457,15 +464,16 @@ function resolveSync(local, remote) {
     const unresolved = [];
 
     for (const [key, val] of allEvents) {
-        if (val.source === 'merged') {
-            stable.push(val.entry);
+        const entry = val.entry;
+        if (val.source === 'merged' || entry.id <= cutoff) {
+            stable.push(entry);
         } else {
             unresolved.push(val);
         }
     }
 
     stable.sort((a, b) => a.id - b.id);
-    let nextId = stable.length > 0 ? stable[stable.length - 1].id + 1 : 1;
+    let nextId = stable.length > 0 ? Math.max(stable[stable.length - 1].id + 1, cutoff + 1) : cutoff + 1;
 
     unresolved.sort((a, b) => {
         const aTime = new Date(a.entry.created_at || 0).getTime();
@@ -522,7 +530,17 @@ async function syncWithSupabase() {
         if (error) throw error;
         
         const localEntries = await Store.all();
-        const { mergedList, shiftsCount, addedCount } = resolveSync(localEntries, remoteEntries);
+        
+        // Dynamically compute/load baseline cutoff ID
+        const SYNC_CUTOFF_KEY = 'viewedtv-sync-cutoff';
+        let cutoff = parseInt(localStorage.getItem(SYNC_CUTOFF_KEY), 10);
+        if (isNaN(cutoff)) {
+            // Set the cutoff to the maximum ID of local entries right now
+            cutoff = localEntries.length > 0 ? Math.max(...localEntries.map(e => e.id)) : 0;
+            localStorage.setItem(SYNC_CUTOFF_KEY, cutoff);
+        }
+        
+        const { mergedList, shiftsCount, addedCount } = resolveSync(localEntries, remoteEntries, cutoff);
         
         await Store.clear();
         if (mergedList.length > 0) {
@@ -573,7 +591,7 @@ async function exportData() {
 function sanitizeEntry(raw) {
     if (typeof raw !== 'object' || raw === null) return { name: '' };
     const sequel = Number(raw.sequel);
-    const created_at = raw.created_at || (raw.date ? new Date(raw.date.replace(' ', 'T')).toISOString() : new Date().toISOString());
+    const created_at = raw.created_at || safeGetISOString(raw.date);
     const updated_at = raw.updated_at || created_at;
     return {
         name: String(raw.name || '').trim(),
@@ -628,7 +646,7 @@ async function reload() {
     let migrated = false;
     for (const e of entries) {
         if (!e.created_at) {
-            e.created_at = e.date ? new Date(e.date.replace(' ', 'T')).toISOString() : new Date().toISOString();
+            e.created_at = safeGetISOString(e.date);
             migrated = true;
         }
         if (!e.updated_at) {
