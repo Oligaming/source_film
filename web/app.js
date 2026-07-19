@@ -361,9 +361,199 @@ function setLastSync(action, count) {
     renderLastSync();
 }
 
+const SB_URL_KEY = 'viewedtv-sb-url';
+const SB_KEY_KEY = 'viewedtv-sb-key';
+
+let supabaseClient = null;
+
+function getSupabaseCredentials() {
+    return {
+        url: localStorage.getItem(SB_URL_KEY) || '',
+        key: localStorage.getItem(SB_KEY_KEY) || ''
+    };
+}
+
+function initSupabase() {
+    const { url, key } = getSupabaseCredentials();
+    if (url && key && typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(url, key);
+        return true;
+    }
+    supabaseClient = null;
+    return false;
+}
+
+function renderSupabaseStatus(msg = '', isError = false) {
+    const statusEl = $('sb-status');
+    if (!statusEl) return;
+    const { url } = getSupabaseCredentials();
+    if (!url) {
+        statusEl.textContent = 'Status: Not configured';
+        statusEl.style.color = '#9aa0a6';
+    } else if (msg) {
+        statusEl.textContent = `Status: ${msg}`;
+        statusEl.style.color = isError ? '#ff4d6d' : '#4caf50';
+    } else {
+        statusEl.textContent = 'Status: Configured (ready)';
+        statusEl.style.color = '#4caf50';
+    }
+}
+
 function openSettings() {
     renderLastSync();
+    const { url, key } = getSupabaseCredentials();
+    $('sb-url').value = url;
+    $('sb-key').value = key;
+    renderSupabaseStatus();
     $('settings-modal').style.display = 'block';
+}
+
+function resolveSync(local, remote) {
+    const keyFn = e => [
+        e.name.trim().toLowerCase(),
+        e.type,
+        String(e.season),
+        String(e.date || '').replace(' ', 'T'),
+    ].join('|');
+
+    const allEvents = new Map();
+
+    for (const r of remote) {
+        const key = keyFn(r);
+        const cleanR = {
+            ...r,
+            id: Number(r.id),
+            tags: Array.isArray(r.tags) ? r.tags : (r.tags ? String(r.tags).split(',') : [])
+        };
+        allEvents.set(key, { source: 'remote', entry: cleanR });
+    }
+
+    for (const l of local) {
+        const key = keyFn(l);
+        const existing = allEvents.get(key);
+        
+        if (existing) {
+            const r = existing.entry;
+            const lTime = new Date(l.updated_at || 0).getTime();
+            const rTime = new Date(r.updated_at || 0).getTime();
+            
+            const olderCreated = new Date(l.created_at || 0) < new Date(r.created_at || 0)
+                ? (l.created_at || r.created_at)
+                : (r.created_at || l.created_at);
+                
+            let merged;
+            if (lTime >= rTime) {
+                merged = { ...l, id: r.id, created_at: olderCreated };
+            } else {
+                merged = { ...r, id: r.id, created_at: olderCreated };
+            }
+            allEvents.set(key, { source: 'merged', entry: merged });
+        } else {
+            allEvents.set(key, { source: 'local', entry: l });
+        }
+    }
+
+    const stable = [];
+    const unresolved = [];
+
+    for (const [key, val] of allEvents) {
+        if (val.source === 'merged') {
+            stable.push(val.entry);
+        } else {
+            unresolved.push(val);
+        }
+    }
+
+    stable.sort((a, b) => a.id - b.id);
+    let nextId = stable.length > 0 ? stable[stable.length - 1].id + 1 : 1;
+
+    unresolved.sort((a, b) => {
+        const aTime = new Date(a.entry.created_at || 0).getTime();
+        const bTime = new Date(b.entry.created_at || 0).getTime();
+        if (aTime !== bTime) return aTime - bTime;
+        return a.entry.name.localeCompare(b.entry.name);
+    });
+
+    let shiftsCount = 0;
+    let addedCount = 0;
+
+    for (const item of unresolved) {
+        if (item.source === 'local' || item.source === 'remote') {
+            addedCount++;
+        }
+    }
+
+    const mergedList = [...stable];
+
+    for (const item of unresolved) {
+        const entry = item.entry;
+        const oldId = entry.id;
+        const newId = nextId++;
+        
+        if (oldId !== newId) {
+            shiftsCount++;
+        }
+        
+        mergedList.push({
+            ...entry,
+            id: newId
+        });
+    }
+
+    mergedList.sort((a, b) => a.id - b.id);
+
+    return { mergedList, shiftsCount, addedCount };
+}
+
+async function syncWithSupabase() {
+    if (!initSupabase()) {
+        alert('Please configure Supabase URL and Anon Key first.');
+        return;
+    }
+    
+    renderSupabaseStatus('Syncing...', false);
+    $('sb-sync-btn').disabled = true;
+    
+    try {
+        const { data: remoteEntries, error } = await supabaseClient
+            .from('entries')
+            .select('*');
+            
+        if (error) throw error;
+        
+        const localEntries = await Store.all();
+        const { mergedList, shiftsCount, addedCount } = resolveSync(localEntries, remoteEntries);
+        
+        await Store.clear();
+        if (mergedList.length > 0) {
+            await Store.bulkAdd(mergedList);
+        }
+        
+        const { error: deleteError } = await supabaseClient
+            .from('entries')
+            .delete()
+            .gte('id', 0);
+        if (deleteError) throw deleteError;
+        
+        if (mergedList.length > 0) {
+            const { error: insertError } = await supabaseClient
+                .from('entries')
+                .insert(mergedList);
+            if (insertError) throw insertError;
+        }
+        
+        await reload();
+        
+        setLastSync('supabase', mergedList.length);
+        renderSupabaseStatus(`Synced successfully! (${addedCount} new, ${shiftsCount} shifted)`, false);
+        alert(`Sync complete!\nTotal entries: ${mergedList.length}\nNew entries: ${addedCount}\nIDs shifted: ${shiftsCount}`);
+    } catch (err) {
+        console.error('Supabase Sync error:', err);
+        renderSupabaseStatus(`Error: ${err.message || err}`, true);
+        alert('Sync failed: ' + (err.message || err));
+    } finally {
+        $('sb-sync-btn').disabled = false;
+    }
 }
 
 // --- Import / export -------------------------------------------------------
@@ -383,6 +573,8 @@ async function exportData() {
 function sanitizeEntry(raw) {
     if (typeof raw !== 'object' || raw === null) return { name: '' };
     const sequel = Number(raw.sequel);
+    const created_at = raw.created_at || (raw.date ? new Date(raw.date.replace(' ', 'T')).toISOString() : new Date().toISOString());
+    const updated_at = raw.updated_at || created_at;
     return {
         name: String(raw.name || '').trim(),
         type: TYPES.includes(raw.type) ? raw.type : 'Movie',
@@ -394,6 +586,8 @@ function sanitizeEntry(raw) {
         date: String(raw.date || ''),
         season: String(raw.season ?? '0').trim() || '0',
         tags: tagList(raw.tags),
+        created_at,
+        updated_at,
     };
 }
 
@@ -431,6 +625,22 @@ async function importData(file) {
 // --- Boot ------------------------------------------------------------------
 async function reload() {
     entries = await Store.all();
+    let migrated = false;
+    for (const e of entries) {
+        if (!e.created_at) {
+            e.created_at = e.date ? new Date(e.date.replace(' ', 'T')).toISOString() : new Date().toISOString();
+            migrated = true;
+        }
+        if (!e.updated_at) {
+            e.updated_at = e.created_at;
+            migrated = true;
+        }
+    }
+    if (migrated) {
+        for (const e of entries) {
+            await Store.put(e);
+        }
+    }
     refresh();
     renderStats(entries);
 }
@@ -445,6 +655,16 @@ function wireEvents() {
         if (e.target.files[0]) importData(e.target.files[0]);
         e.target.value = '';
     });
+    $('sb-save-btn').addEventListener('click', () => {
+        const url = $('sb-url').value.trim();
+        const key = $('sb-key').value.trim();
+        localStorage.setItem(SB_URL_KEY, url);
+        localStorage.setItem(SB_KEY_KEY, key);
+        initSupabase();
+        renderSupabaseStatus();
+        alert('Supabase configuration saved.');
+    });
+    $('sb-sync-btn').addEventListener('click', syncWithSupabase);
     $('set-today-date').addEventListener('click', setTodayDate);
     $('set-today-time').addEventListener('click', setNowTime);
     $('add-saga').addEventListener('click', () => {
@@ -521,12 +741,26 @@ function wireEvents() {
         try {
             const entry = readForm();
             if (editingId != null) {
-                await Store.put({ ...entry, id: editingId });
+                const existing = entries.find(x => x.id === editingId);
+                const created_at = existing?.created_at || new Date().toISOString();
+                const updated = { 
+                    ...entry, 
+                    id: editingId, 
+                    created_at, 
+                    updated_at: new Date().toISOString() 
+                };
+                await Store.put(updated);
                 const i = entries.findIndex(x => x.id === editingId);
-                if (i !== -1) entries[i] = { ...entry, id: editingId };
+                if (i !== -1) entries[i] = updated;
             } else {
-                const id = await Store.add(entry);
-                entries.push({ ...entry, id });
+                const created_at = new Date().toISOString();
+                const updated = {
+                    ...entry,
+                    created_at,
+                    updated_at: created_at
+                };
+                const id = await Store.add(updated);
+                entries.push({ ...updated, id });
             }
             refresh();
             renderStats(entries);
@@ -583,5 +817,6 @@ function registerServiceWorker() {
 wireEvents();
 initStats();
 updateSortIndicators();
+initSupabase();
 reload();
 registerServiceWorker();

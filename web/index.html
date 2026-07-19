@@ -104,6 +104,24 @@
             </section>
 
             <section class="settings-section">
+                <h3>Supabase Cloud Sync</h3>
+                <p id="sb-status" class="sync-status">Status: Not configured</p>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="sb-url">Supabase URL:</label>
+                    <input type="text" id="sb-url" placeholder="https://your-project.supabase.co">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="sb-key">Supabase Anon Key:</label>
+                    <input type="password" id="sb-key" placeholder="eyJhbGciOi...">
+                </div>
+                <div class="settings-actions" style="margin-top: 10px;">
+                    <button type="button" id="sb-save-btn">Save Config</button>
+                    <button type="button" id="sb-sync-btn" class="secondary">Sync Now</button>
+                </div>
+                <p class="hint">Enter your Supabase database details to sync across all devices. Sync will automatically download remote changes, upload local changes, and resolve ID conflicts in creation order.</p>
+            </section>
+
+            <section class="settings-section">
                 <h3>Install on Android</h3>
                 <ol class="tuto">
                     <li>Push this repo to GitHub — the included workflow deploys the
@@ -225,6 +243,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="db.js"></script>
     <script src="app.js"></script>
 </body>
