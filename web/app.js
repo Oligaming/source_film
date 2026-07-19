@@ -423,80 +423,126 @@ function resolveSync(local, remote, cutoff) {
         String(e.date || '').replace(' ', 'T'),
     ].join('|');
 
-    const allEvents = new Map();
+    const cleanRemote = remote.map(r => ({
+        ...r,
+        id: Number(r.id),
+        tags: Array.isArray(r.tags) ? r.tags : (r.tags ? String(r.tags).split(',') : [])
+    }));
 
-    for (const r of remote) {
-        const key = keyFn(r);
-        const cleanR = {
-            ...r,
-            id: Number(r.id),
-            tags: Array.isArray(r.tags) ? r.tags : (r.tags ? String(r.tags).split(',') : [])
-        };
-        allEvents.set(key, { source: 'remote', entry: cleanR });
-    }
+    const remoteByKey = new Map();
+    for (const r of cleanRemote) remoteByKey.set(keyFn(r), r);
+
+    const mergedList = [];
+    const localProcessed = new Set();
 
     for (const l of local) {
         const key = keyFn(l);
-        const existing = allEvents.get(key);
-        
-        if (existing) {
-            const r = existing.entry;
+        const r = remoteByKey.get(key);
+        if (r) {
             const lTime = new Date(l.updated_at || 0).getTime();
             const rTime = new Date(r.updated_at || 0).getTime();
-            
             const olderCreated = new Date(l.created_at || 0) < new Date(r.created_at || 0)
                 ? (l.created_at || r.created_at)
                 : (r.created_at || l.created_at);
+
+            const stableId = r.id || l.id;
+
+            const merged = lTime >= rTime
+                ? { ...l, id: stableId, created_at: olderCreated }
+                : { ...r, id: stableId, created_at: olderCreated };
+
+            mergedList.push(merged);
+            remoteByKey.delete(key);
+            localProcessed.add(l.id);
+        }
+    }
+
+    const unmatched = [];
+    for (const [key, r] of remoteByKey) unmatched.push(r);
+    for (const l of local) {
+        if (!localProcessed.has(l.id)) {
+            unmatched.push(l);
+        }
+    }
+
+    const legacyMap = new Map();
+    const newUnresolved = [];
+
+    for (const entry of unmatched) {
+        if (entry.id <= cutoff) {
+            const existing = legacyMap.get(entry.id);
+            if (existing) {
+                const eTime = new Date(entry.updated_at || 0).getTime();
+                const exTime = new Date(existing.updated_at || 0).getTime();
+                const olderCreated = new Date(entry.created_at || 0) < new Date(existing.created_at || 0)
+                    ? (entry.created_at || existing.created_at)
+                    : (existing.created_at || entry.created_at);
                 
-            let merged;
-            if (lTime >= rTime) {
-                merged = { ...l, id: r.id, created_at: olderCreated };
+                const merged = eTime >= exTime ? entry : existing;
+                legacyMap.set(entry.id, { ...merged, created_at: olderCreated });
             } else {
-                merged = { ...r, id: r.id, created_at: olderCreated };
+                legacyMap.set(entry.id, entry);
             }
-            allEvents.set(key, { source: 'merged', entry: merged });
         } else {
-            allEvents.set(key, { source: 'local', entry: l });
+            newUnresolved.push(entry);
         }
     }
 
-    const stable = [];
-    const unresolved = [];
+    for (const [id, entry] of legacyMap) {
+        mergedList.push(entry);
+    }
 
-    for (const [key, val] of allEvents) {
-        const entry = val.entry;
-        if (val.source === 'merged' || entry.id <= cutoff) {
-            stable.push(entry);
+    const newGroupedById = new Map();
+    for (const entry of newUnresolved) {
+        if (!newGroupedById.has(entry.id)) {
+            newGroupedById.set(entry.id, []);
+        }
+        newGroupedById.get(entry.id).push(entry);
+    }
+
+    const stableNew = [];
+    const collidingNew = [];
+
+    for (const [id, list] of newGroupedById) {
+        if (list.length === 1) {
+            stableNew.push(list[0]);
         } else {
-            unresolved.push(val);
+            list.sort((a, b) => {
+                const aTime = new Date(a.created_at || 0).getTime();
+                const bTime = new Date(b.created_at || 0).getTime();
+                return aTime - bTime;
+            });
+            stableNew.push(list[0]);
+            for (let i = 1; i < list.length; i++) {
+                collidingNew.push(list[i]);
+            }
         }
     }
 
-    stable.sort((a, b) => a.id - b.id);
-    let nextId = stable.length > 0 ? Math.max(stable[stable.length - 1].id + 1, cutoff + 1) : cutoff + 1;
+    for (const entry of stableNew) {
+        mergedList.push(entry);
+    }
 
-    unresolved.sort((a, b) => {
-        const aTime = new Date(a.entry.created_at || 0).getTime();
-        const bTime = new Date(b.entry.created_at || 0).getTime();
-        if (aTime !== bTime) return aTime - bTime;
-        return a.entry.name.localeCompare(b.entry.name);
-    });
+    const usedIds = new Set(mergedList.map(e => e.id));
+    let nextId = cutoff + 1;
 
     let shiftsCount = 0;
-    let addedCount = 0;
+    let addedCount = unmatched.length;
 
-    for (const item of unresolved) {
-        if (item.source === 'local' || item.source === 'remote') {
-            addedCount++;
+    collidingNew.sort((a, b) => {
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return aTime - bTime;
+    });
+
+    for (const entry of collidingNew) {
+        while (usedIds.has(nextId)) {
+            nextId++;
         }
-    }
-
-    const mergedList = [...stable];
-
-    for (const item of unresolved) {
-        const entry = item.entry;
+        
         const oldId = entry.id;
-        const newId = nextId++;
+        const newId = nextId;
+        usedIds.add(newId);
         
         if (oldId !== newId) {
             shiftsCount++;
