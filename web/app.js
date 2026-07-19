@@ -729,55 +729,6 @@ function wireEvents() {
         alert('Supabase configuration saved.');
     });
     $('sb-sync-btn').addEventListener('click', syncWithSupabase);
-    $('clear-local-btn').addEventListener('click', async () => {
-        if (!confirm('This will delete all local entries. Are you sure?')) return;
-        await Store.clear();
-        localStorage.removeItem('viewedtv-sync-cutoff');
-        await reload();
-        alert('Local database cleared.');
-    });
-    $('sb-push-btn').addEventListener('click', async () => {
-        if (!initSupabase()) {
-            alert('Please configure Supabase URL and Anon Key first.');
-            return;
-        }
-        if (!confirm('This will overwrite Supabase database with your current local database. Proceed?')) return;
-        
-        $('sb-push-btn').disabled = true;
-        renderSupabaseStatus('Force pushing...', false);
-        try {
-            const localEntries = await Store.all();
-            
-            // Delete everything remote
-            const { error: deleteError } = await supabaseClient
-                .from('entries')
-                .delete()
-                .gte('id', 0);
-            if (deleteError) throw deleteError;
-            
-            // Insert local
-            if (localEntries.length > 0) {
-                const { error: insertError } = await supabaseClient
-                    .from('entries')
-                    .insert(localEntries);
-                if (insertError) throw insertError;
-            }
-            
-            // Reset sync cutoff to the max local ID right now
-            const SYNC_CUTOFF_KEY = 'viewedtv-sync-cutoff';
-            const cutoff = localEntries.length > 0 ? Math.max(...localEntries.map(e => e.id)) : 0;
-            localStorage.setItem(SYNC_CUTOFF_KEY, cutoff);
-            
-            renderSupabaseStatus('Force push successful!', false);
-            alert('Supabase database has been overwritten with your local database.');
-        } catch (err) {
-            console.error(err);
-            renderSupabaseStatus('Force push failed', true);
-            alert('Force push failed: ' + err.message);
-        } finally {
-            $('sb-push-btn').disabled = false;
-        }
-    });
     $('set-today-date').addEventListener('click', setTodayDate);
     $('set-today-time').addEventListener('click', setNowTime);
     $('add-saga').addEventListener('click', () => {
