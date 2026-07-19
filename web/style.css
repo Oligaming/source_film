@@ -104,6 +104,20 @@ body {
 #search-container button.secondary {
     background-color: #0a0f1c;
 }
+#load-more-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    background-color: #0e1726;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95em;
+    transition: background-color 0.2s;
+}
+#load-more-btn:hover {
+    background-color: #1a2438;
+}
 
 /* --- Modal --- */
 .modal {

@@ -81,10 +81,23 @@ function rowHtml(e) {
     </tr>`;
 }
 
+let visibleCount = 100;
+
 function render(list) {
-    $('entries').innerHTML = list.length
-        ? list.map(rowHtml).join('')
+    const visibleList = list.slice(0, visibleCount);
+    $('entries').innerHTML = visibleList.length
+        ? visibleList.map(rowHtml).join('')
         : '<tr class="empty-row"><td colspan="11">No entries yet — click “+ Add new”.</td></tr>';
+        
+    const loadMoreBtn = $('load-more-btn');
+    if (loadMoreBtn) {
+        if (list.length > visibleCount) {
+            loadMoreBtn.style.display = 'inline-block';
+            loadMoreBtn.textContent = `Show 100 More (${list.length - visibleCount} remaining)`;
+        } else {
+            loadMoreBtn.style.display = 'none';
+        }
+    }
 }
 
 // --- Stats -----------------------------------------------------------------
@@ -203,6 +216,11 @@ function updateSortIndicators() {
 }
 
 function refresh() {
+    visibleCount = 100;
+    refreshShow();
+}
+
+function refreshShow() {
     render(sortList(applySearch(entries, $('search').value)));
 }
 
@@ -723,6 +741,10 @@ function wireEvents() {
     $('import-file').addEventListener('change', e => {
         if (e.target.files[0]) importData(e.target.files[0]);
         e.target.value = '';
+    });
+    $('load-more-btn')?.addEventListener('click', () => {
+        visibleCount += 100;
+        refreshShow();
     });
     $('sb-save-btn')?.addEventListener('click', () => {
         const url = $('sb-url').value.trim();
